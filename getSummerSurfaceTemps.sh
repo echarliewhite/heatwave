@@ -6,4 +6,5 @@ files="/climdata/ERAInterim/all_levels/dailymean/t/*nc"
 
 for file in $files
 do
-
+    echo $file
+done
