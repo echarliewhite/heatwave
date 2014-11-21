@@ -34,11 +34,14 @@ wn_max = 10 # max wavenumber for spectrum calculation
 plot_freq_cutoff = 1
 vertical_scale = 1
 
-datatrans, datastand, dataprop = calc_wnfreq_spectrum(datalon,wn_max)
+datatrans, datastand, dataprop = wnfreq.calc_wnfreq_spectrum(datalon,wn_max)
 
 # plot FFT coeffs
-plot_wnfreq_spectrum_lineplots(datatrans,1,plot_freq_cutoff,scale_factor,vertical_scale)
+wnfreq.plot_wnfreq_spectrum_lineplots(datatrans,1,plot_freq_cutoff,
+                                      scale_factor,vertical_scale)
 # plot standing FFT coeffs
-plot_wnfreq_spectrum_lineplots(datastand,2,plot_freq_cutoff,scale_factor,vertical_scale)
+wnfreq.plot_wnfreq_spectrum_lineplots(datastand,2,plot_freq_cutoff,
+                               scale_factor,vertical_scale)
 # plot travelling FFT coeffs
-plot_wnfreq_spectrum_lineplots(dataprop,3,plot_freq_cutoff,scale_factor,vertical_scale)
+wnfreq.plot_wnfreq_spectrum_lineplots(dataprop,3,plot_freq_cutoff,
+                               scale_factor,vertical_scale)
