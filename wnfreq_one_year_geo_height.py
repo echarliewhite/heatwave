@@ -5,7 +5,8 @@ Email: charlie.white@mail.utoronto.ca
 Github: echarliewhite
 Description: This script is a test of the wnfreq_routines_2.0.py functions on
 one year of ERA-Interim geopotential height data on one pressure surface.
-Should be run on animus or sila.
+Should be run on animus or sila. Run ssh with -X option to allow X11 forwarding
+for matplotlib.
 """
 import wnfreq_routines_2_0 as wnfreq
 import numpy as np
@@ -25,5 +26,8 @@ lat = nc.variables['g0_lat_2'][:]
 plev = nc.variables['lv_ISBL1'][:]
 time = nc.variables['initial_time0_hours'][:]
 nc.close()
+
+# average over latitudes
+datalon = np.average(data,axis=2)
 
 import pdb; pdb.set_trace()

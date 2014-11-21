@@ -23,4 +23,4 @@ for file in os.listdir('/users/jk/14/cwhite/ERAInterim/dailymean/summersurface/t
     time = nc.variables['initial_time0_hours'][:]
     nc.close()
 
-import pdb; pdb.set_trace()
+# average along lines of longitude (i.e. eliminate latitude dimension)
