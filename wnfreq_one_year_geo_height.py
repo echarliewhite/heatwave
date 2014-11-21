@@ -31,9 +31,10 @@ nc.close()
 datalon = np.squeeze(np.average(data,axis=2))
 
 wn_max = 10 # max wavenumber for spectrum calculation
-plot_freq_cutoff = 1
+plot_freq_cutoff = 2
 vertical_scale = 1
 
+import pdb; pdb.set_trace()
 datatrans, datastand, dataprop = wnfreq.calc_wnfreq_spectrum(datalon,wn_max)
 
 # plot FFT coeffs
