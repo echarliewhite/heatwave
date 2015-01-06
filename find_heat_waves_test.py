@@ -5,7 +5,7 @@ import numpy as np
 
 year = 30
 threshold = 97.5
-directory = '/Users/charliewhite/Documents/Year4/Thesis/climdata/ERAInterim/dailymean/summersurface/t/'
+directory = '/Users/charliewhite/Documents/Year4/Thesis/climdata/ERAInterim/dailymean/t/summersurface/'
 temps, time, plev, lat, lon = fhw.import_temps(directory)
 heatwavedays = fhw.find_heat_waves(temps,threshold,year)
 avtemp = np.zeros(time.size)

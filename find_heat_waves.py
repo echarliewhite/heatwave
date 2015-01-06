@@ -3,8 +3,8 @@ File: find_heat_waves.py
 Author: Charlie White
 Email: charlie.white@mail.utoronto.ca
 Github: echarliewhite
-Description: This script will identify heat waves based on a threshold
-temperature defined relative to historical temperatures.
+Description: This script contains functions that can identify heat waves based
+on a threshold temperature defined relative to historical temperatures.
 """
 import numpy as np
 import netCDF4 as nc4
