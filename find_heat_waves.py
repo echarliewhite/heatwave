@@ -43,13 +43,16 @@ def import_temps(directory):
     return data, time, plev, lat, lon
     
 def find_heat_waves(temps,threshold,year):
-    """Finds heat waves in a given year based on a historical threshold
+    """
+    Finds heat waves in a given year based on a historical threshold
     percentile at each date and location. Heat wave day is defined as one in
     which the threshold temp is exceeded on that day and the following four
     days in at least 10 locations/grid points. Assumes that in temps the first
-    axis is represents the year and the second axis represents the date."""
+    axis [0] represents the year and the second axis [1] represents the date.
+    """
     
-    # find threshold percentile value
+    # find threshold percentile value at each location/date
+    # (year axis removed)
     temps_threshold = np.percentile(temps,threshold,axis=0)
     hot_day_loc = np.greater(temps[year], temps_threshold)
     hot_day = np.empty(temps.shape[1],dtype=bool)
@@ -68,6 +71,5 @@ def find_heat_waves(temps,threshold,year):
             for j in range(4):
                 if not hot_day[i+j+1]:
                     heatwave[i] = False
-
 
     return heatwave
