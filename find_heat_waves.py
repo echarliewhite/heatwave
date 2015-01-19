@@ -42,13 +42,13 @@ def import_temps(directory):
     # add in year as a returned variable
     return data, time, plev, lat, lon
     
-def find_heat_waves(temps,threshold,year):
+def find_heat_waves(temps,threshold,year,lat,lon):
     """
     Finds heat waves in a given year based on a historical threshold
     percentile at each date and location. Heat wave day is defined as one in
     which the threshold temp is exceeded on that day and the following four
-    days in at least 10 locations/grid points. Assumes that in temps the first
-    axis [0] represents the year and the second axis [1] represents the date.
+    days in at least 10 locations/grid points. Assumes that temps has structure
+    [year,day,plev,lat,lon]
     """
     
     # find threshold percentile value at each location/date
@@ -65,11 +65,30 @@ def find_heat_waves(temps,threshold,year):
 
     heatwave = np.empty(hot_day.size,dtype=bool)
     heatwave *= 0
+    # check for heatwave criteria on each day and subsequent days
     for i in range(heatwave.size-4):
         if hot_day[i]:
             heatwave[i] = True
+            # locations where it is hot on day i
+            hot_day_indices = np.nonzero(hot_day_loc[i,0,:,:])
+            # average latitude and longitude of hot locations
+            lat_av = np.average(lat[hot_day_indices[0]])
+            lon_av = np.average(lon[hot_day_indices[1]])
+
             for j in range(4):
                 if not hot_day[i+j+1]:
                     heatwave[i] = False
+                else:
+                    # check if center of hot days has moved by more than d
+                    # degrees in lat or lon
+                    d = 7.5
+                    hot_day_indices = np.nonzero(hot_day_loc[i+j+1,0,:,:])
+                    lat_av_next = np.average(lat[hot_day_indices[0]])
+                    lon_av_next = np.average(lon[hot_day_indices[1]])
+                    # if i in [8,33,50]:
+                    #     import pdb; pdb.set_trace()
+                    if abs(lat_av_next - lat_av) > d or abs(lon_av_next - lon_av) > d:
+                        heatwave[i] = False
+                    lat_av, lon_av = lat_av_next, lon_av_next
 
     return heatwave

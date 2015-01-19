@@ -4,13 +4,13 @@ import matplotlib.collections as col
 import numpy as np
 
 # arguments
-year = 30
 threshold = 97.5
 directory = '/Users/charliewhite/Documents/Year4/Thesis/climdata/ERAInterim/dailymean/t/summersurface/'
 
 # find heat waves in given year
 temps, time, plev, lat, lon = fhw.import_temps(directory)
-heatwavedays = fhw.find_heat_waves(temps,threshold,year)
+year = temps.shape[0]-1 
+heatwavedays = fhw.find_heat_waves(temps,threshold,year,lat,lon)
 
 # what is the daily average temperature in the given year, and across all years
 avtemp = np.zeros(time.size)

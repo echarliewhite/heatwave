@@ -41,92 +41,115 @@ geoheight = np.squeeze(z_data) # remove lat and plev dimensions (single-valued)
 t_dir = '/Users/charliewhite/Documents/Year4/Thesis/climdata/ERAInterim/dailymean/t/summersurface/'
 t_data, t_time, t_plev, t_lat, t_lon = fhw.import_temps(t_dir)
 
-# determine which days have heat waves
-heatwave = fhw.find_heat_waves(t_data, 97.5, t_data.shape[0]-1) # 2013
-# find the starting dates of heat wave events
-heatwavestart = np.empty(heatwave.size,dtype=bool)
-if heatwave[0] == True:
-    heatwavestart[0] = True
-else:
-    heatwavestart[0] = False
-for i in range(1,heatwave.size):
-    if heatwave[i] == True and heatwave[i-1] == False:
-        heatwavestart[i] = True
-    else:
-        heatwavestart[i] = False
-
-# initialize arrays (3) to hold FFTs for each N_day day period proceeding heat waves
+# initialize arrays (3) to hold FFTs for each N_day day period preceeding heat waves
 # for each N_day period the array size is the same as the input array
 # [time,...,lon], but the lon dimension is set to wn_max (higher wavenumbers
-# are cut off). Dimensions are therefore [N_hw,Ndays,wn_max]
-N_hw = np.sum(heatwavestart) # number of heatwaves
-N_ints = z_time.size/N_days # max possible number of FFT intervals
-hw_fft_total = np.zeros((N_hw,N_days,wn_max))
-hw_fft_trav = np.zeros((N_hw,N_days,wn_max))
-hw_fft_stand = np.zeros((N_hw,N_days,wn_max))
+# are cut off). Dimensions are therefore [Ndays,wn_max]
+hw_fft_total = np.zeros((N_days,wn_max))
+hw_fft_trav = np.zeros((N_days,wn_max))
+hw_fft_stand = np.zeros((N_days,wn_max))
 
-all_days_fft_total = np.zeros((N_ints,N_days,wn_max))
-all_days_fft_trav = np.zeros((N_ints,N_days,wn_max))
-all_days_fft_stand = np.zeros((N_ints,N_days,wn_max))
+all_days_fft_total = np.zeros((N_days,wn_max))
+all_days_fft_trav = np.zeros((N_days,wn_max))
+all_days_fft_stand = np.zeros((N_days,wn_max))
 
-# starting N_days into the time period, check for days where heatwaves start.
-# Take the N_days before that and take the FFT, store in arrays (3).
-n = 0 # for keeping track of the heatwave count
-for i in range(20,heatwavestart.size):
-    if heatwavestart[i] == True:
-        hw_fft_total[n,:,:], hw_fft_stand[n,:,:], hw_fft_trav[n,:,:] = \
-          wnfreq.calc_wnfreq_spectrum(geoheight[i+shift_days-N_days:i+shift_days,:],wn_max)
-        n += 1
+Total_N_hw = 0 # track total number of heatwaves across all years
+Total_N_int = 0 # track total number of 20 day periods across all years
 
-# now take same FFTs for all 20 day periods in the interval. (general climate)
-# consider taking all 20 day intervals NOT covered by heatwaves.
-for n in range(N_ints):
-    i = n*N_days
-    all_days_fft_total[n,:,:], all_days_fft_stand[n,:,:], all_days_fft_trav[n,:,:] = \
-      wnfreq.calc_wnfreq_spectrum(geoheight[i:i+N_days,:],wn_max)
+# for each year
+for k in range(t_data.shape[0]):
+    # determine which days have heat waves
+    heatwave = fhw.find_heat_waves(t_data, 98.5, k, t_lat, t_lon)
+    # find the starting dates of heat wave events
+    heatwavestart = np.empty(heatwave.size,dtype=bool)
+    if heatwave[0] == True:
+        heatwavestart[0] = True
+    else:
+        heatwavestart[0] = False
+    for i in range(1,heatwave.size):
+        if heatwave[i] == True and heatwave[i-1] == False:
+            heatwavestart[i] = True
+        else:
+            heatwavestart[i] = False
+
+    N_hw = np.sum(heatwavestart) # number of heatwaves
+    N_ints = z_time.size/N_days # max possible number of FFT intervals
+
+    # starting N_days into the time period, check for days where heatwaves start.
+    # Take the N_days before that and take the FFT, store in arrays (3).
+    for i in range(N_days,heatwavestart.size):
+        if heatwavestart[i] == True:
+            hw_fft_total_temp, hw_fft_stand_temp, hw_fft_trav_temp = \
+              wnfreq.calc_wnfreq_spectrum(geoheight[i+shift_days-N_days:i+shift_days,:],wn_max)
+            Total_N_hw += 1
+            hw_fft_total += np.absolute(hw_fft_total_temp)
+            hw_fft_stand += np.absolute(hw_fft_stand_temp)
+            hw_fft_trav += np.absolute(hw_fft_trav_temp)
+
+    # now take same FFTs for all 20 day periods in the interval. (general climate)
+    # consider taking all 20 day intervals NOT covered by heatwaves.
+    for n in range(N_ints):
+        i = n*N_days
+        all_days_fft_total_temp, all_days_fft_stand_temp, all_days_fft_trav_temp = \
+          wnfreq.calc_wnfreq_spectrum(geoheight[i:i+N_days,:],wn_max)
+        Total_N_int += 1
+        all_days_fft_total += np.absolute(all_days_fft_total_temp)
+        all_days_fft_stand += np.absolute(all_days_fft_stand_temp)
+        all_days_fft_trav += np.absolute(all_days_fft_trav_temp)
 
 # add up wavelength amplitudes for standing travelling total waves in
 # pre-heatwave periods and divide by the number of periods (average amplitude
-# at each wavelength)
-hw_fft_total_average = np.average(np.average(hw_fft_total,axis=0),axis=0)
-hw_fft_stand_average = np.average(np.average(hw_fft_stand,axis=0),axis=0)
-hw_fft_trav_average = np.average(np.average(hw_fft_trav,axis=0),axis=0)
+# at each wavelength). Take absolute value.
+hw_fft_total_average = hw_fft_total/Total_N_hw
+hw_fft_stand_average = hw_fft_stand/Total_N_hw
+hw_fft_trav_average  = hw_fft_trav/Total_N_hw
 
-all_days_fft_total_average = np.average(np.average(all_days_fft_total,axis=0),axis=0)
-all_days_fft_stand_average = np.average(np.average(all_days_fft_stand,axis=0),axis=0)
-all_days_fft_trav_average = np.average(np.average(all_days_fft_trav,axis=0),axis=0)
+# averaging over frequency probably the wrong thing to do here.
+hw_fft_total_average_wn = np.average(hw_fft_total_average,axis=1)
+hw_fft_stand_average_wn = np.average(hw_fft_stand_average,axis=1)
+hw_fft_trav_average_wn = np.average(hw_fft_trav_average,axis=1)
 
-diff_fft_total_average = hw_fft_total_average - all_days_fft_total_average
-diff_fft_stand_average = hw_fft_stand_average - all_days_fft_stand_average
-diff_fft_trav_average = hw_fft_trav_average - all_days_fft_trav_average
+all_days_fft_total_average = all_days_fft_total/Total_N_int
+all_days_fft_stand_average = all_days_fft_stand/Total_N_int
+all_days_fft_trav_average  = all_days_fft_trav/Total_N_int
+
+# averaging over frequency probably the wrong thing to do here.
+all_days_fft_total_average_wn = np.average(all_days_fft_total_average,axis=1)
+all_days_fft_stand_average_wn = np.average(all_days_fft_stand_average,axis=1)
+all_days_fft_trav_average_wn = np.average(all_days_fft_trav_average,axis=1)
 
 # look at start and -20 days? progression in 20 day period? average across 20 days?
 
 # plot
-fig,ax = plt.subplots(3,3)
-ax[0,0].plot(hw_fft_total_average)
-ax[0,0].set_title("Pre-Heatwave Total FFT")
-ax[0,1].plot(hw_fft_stand_average)
-ax[0,1].set_title("Pre-Heatwave Standing FFT")
-ax[0,2].plot(hw_fft_trav_average)
-ax[0,2].set_title("Pre-Heatwave Travelling FFT")
-ax[1,0].plot(all_days_fft_total_average)
-ax[1,0].set_title("All Days Total FFT")
-ax[1,1].plot(all_days_fft_stand_average)
-ax[1,1].set_title("All Days Standing FFT")
-ax[1,2].plot(all_days_fft_trav_average)
-ax[1,2].set_title("All Days Travelling FFT")
-ax[2,0].plot(diff_fft_total_average)
-ax[2,0].set_title("Difference Total FFT")
-ax[2,1].plot(diff_fft_stand_average)
-ax[2,1].set_title("Difference Standing FFT")
-ax[2,2].plot(diff_fft_trav_average)
-ax[2,2].set_title("Difference Travelling FFT")
-
 import pdb; pdb.set_trace()
+bar_width = 0.35
+index = np.arange(wn_max) + 1
+fig,ax = plt.subplots(3,1)
+
+ax[0].bar(index,all_days_fft_total_average_wn,width=bar_width,label='All Days')
+ax[0].bar(index+bar_width,hw_fft_total_average_wn,width=bar_width,
+          color='r',label='Pre-Heat Wave Days')
+ax[0].set_title("Total Fourier Coeffs")
+ax[0].legend()
+ax[0].set_xticks(index,minor=True)
+ax[2].set_xlabel('Wavenumber')
+ax[1].bar(index,all_days_fft_stand_average_wn,width=bar_width,label='All Days')
+ax[1].bar(index+bar_width,hw_fft_stand_average_wn,width=bar_width,
+          color='r',label='Pre-Heat Wave Days')
+ax[1].set_title("Standing Fourier Coeffs")
+ax[1].legend()
+ax[1].set_xticks(index,minor=True)
+ax[2].set_xlabel('Wavenumber')
+ax[2].bar(index,all_days_fft_trav_average_wn,width=bar_width,label='All Days')
+ax[2].bar(index+bar_width,hw_fft_trav_average_wn,width=bar_width,
+          color='r',label='Pre-Heat Wave Days')
+ax[2].set_title("Travelling Fourier Coeffs")
+ax[2].legend()
+ax[2].set_xticks(index,minor=True)
+ax[2].set_xlabel('Wavenumber')
 
 plt.show()
 # Other things to consider: change the period length, shift relative to start
 # day, non-pre-heatwave days only, plot the geopotential at heatwave start
 # dates/animate, different latitudes, take a histogram counting which
-# wavenumber had max amplitude
+# wavenumber had max amplitude, eastward/westward
