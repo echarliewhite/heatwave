@@ -42,18 +42,30 @@ def import_temps(directory):
     # add in year as a returned variable
     return data, time, plev, lat, lon
     
-def find_heat_waves(temps,threshold,year,lat,lon):
+def find_heat_waves(temps,threshold,year,lat,lon,N_points,deg_move):
     """
     Finds heat waves in a given year based on a historical threshold
     percentile at each date and location. Heat wave day is defined as one in
     which the threshold temp is exceeded on that day and the following four
-    days in at least 10 locations/grid points. Assumes that temps has structure
-    [year,day,plev,lat,lon]
+    days in at least N_points locations/grid points. Assumes that temps has
+    structure [year,day,plev,lat,lon]. lat, lon define the latitudes/longitudes
+    represented in temps. N_points determines the number of points which must
+    exceed the threshold temperature. deg_move determines how far the center of
+    the hot locations may move from day to day in degrees latitude OR longitude
+    (to prevent e.g. east coast heat followed coincidentally by west coast heat
+    from being considered a single event.)
     """
     
     # find threshold percentile value at each location/date
     # (year axis removed)
-    temps_threshold = np.percentile(temps,threshold,axis=0)
+    temps_threshold = np.zeros(temps.shape[1:])
+    # look at all temperatures in a 15-day window
+    for i in range(temps_threshold.shape[0]):
+        # ranges change near ends of array
+        lowbound = min(i,7)
+        highbound = min(temps_threshold.shape[0] - 1 - i, 7)
+        temps_threshold[i,:,:,:] = \
+          np.percentile(temps[:,i-lowbound:i+highbound,:,:,:],threshold,axis=(0,1))
     hot_day_loc = np.greater(temps[year], temps_threshold)
     hot_day = np.empty(temps.shape[1],dtype=bool)
     for i in range(hot_day.size):
@@ -62,7 +74,6 @@ def find_heat_waves(temps,threshold,year,lat,lon):
             hot_day[i] = True
         else:
             hot_day[i] = False
-
     heatwave = np.empty(hot_day.size,dtype=bool)
     heatwave *= 0
     # check for heatwave criteria on each day and subsequent days
@@ -79,15 +90,14 @@ def find_heat_waves(temps,threshold,year,lat,lon):
                 if not hot_day[i+j+1]:
                     heatwave[i] = False
                 else:
-                    # check if center of hot days has moved by more than d
+                    # check if center of hot days has moved by more than deg_move
                     # degrees in lat or lon
-                    d = 7.5
                     hot_day_indices = np.nonzero(hot_day_loc[i+j+1,0,:,:])
                     lat_av_next = np.average(lat[hot_day_indices[0]])
                     lon_av_next = np.average(lon[hot_day_indices[1]])
                     # if i in [8,33,50]:
                     #     import pdb; pdb.set_trace()
-                    if abs(lat_av_next - lat_av) > d or abs(lon_av_next - lon_av) > d:
+                    if abs(lat_av_next - lat_av) > deg_move or abs(lon_av_next - lon_av) > deg_move:
                         heatwave[i] = False
                     lat_av, lon_av = lat_av_next, lon_av_next
 
