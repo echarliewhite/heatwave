@@ -15,12 +15,26 @@ import netCDF4 as nc4
 
 # User-defined variables
 wn_max = 20 # max wave number to retain in FFT
-N_days = 30 # number of days over which to take FFT
+N_days = 20 # number of days over which to take FFT
 shift_days = 0 # number of days to shift the FFT interval forward (0 -> ends
                # day before heatwave)
 
 # Constants
 g = 9.81 # for conversion from geopotential to geopotential height
+
+def fft_1d_freq_wn(fft_coeffs_in,wn_max,N):
+    """This function takes a 2D fft, computes the inverse fft, then computes 1D
+    ffts along each axis, averaged over the non-fft axis. I.e. 2D fft in
+    wavenumber and frequency becomes 2 1D ffts in wavenumber and frequency
+    respectively.
+    """
+    real_space_geo = wnfreq.invert_wnfreq_spectrum(fft_coeffs_in,1,wn_max,N,tol=1e6)
+    fft_coeffs_wn = np.fft.fft(real_space_geo,axis=1)
+    fft_coeffs_wn = np.average(np.absolute(fft_coeffs_wn),axis=0)[1:wn_max+1]
+    fft_coeffs_freq = np.fft.fft(real_space_geo,axis=0)
+    fft_coeffs_freq = np.fft.fftshift(np.average(np.absolute(fft_coeffs_freq),axis=1))
+
+    return fft_coeffs_freq, fft_coeffs_wn
 
 # import reanalysis data
 # pressure data
@@ -88,14 +102,18 @@ for k in range(t_data.shape[0]):
             hw_fft_total_temp, hw_fft_stand_temp, hw_fft_trav_temp = \
               wnfreq.calc_wnfreq_spectrum(geoheight[i+shift_days-N_days:i+shift_days,:],wn_max)
             Total_N_hw += 1
-            # these should acutally be inverse ffts i think
-            hw_fft_total_wn += np.absolute(np.sum(hw_fft_total_temp,axis=0))
-            hw_fft_stand_wn += np.absolute(np.sum(hw_fft_stand_temp,axis=0))
-            hw_fft_trav_wn += np.absolute(np.sum(hw_fft_trav_temp,axis=0))
+            # calculate 1D freq/wn ffts
+            fft_total_freq, fft_total_wn = fft_1d_freq_wn(hw_fft_total_temp,wn_max,z_lon.size)
+            fft_stand_freq, fft_stand_wn = fft_1d_freq_wn(hw_fft_stand_temp,wn_max,z_lon.size)
+            fft_trav_freq, fft_trav_wn = fft_1d_freq_wn(hw_fft_trav_temp,wn_max,z_lon.size)
+            # add to total
+            hw_fft_total_wn += fft_total_wn
+            hw_fft_stand_wn += fft_stand_wn
+            hw_fft_trav_wn += fft_trav_wn
 
-            hw_fft_total_freq += np.absolute(np.sum(hw_fft_total_temp,axis=1))
-            hw_fft_stand_freq += np.absolute(np.sum(hw_fft_stand_temp,axis=1))
-            hw_fft_trav_freq += np.absolute(np.sum(hw_fft_trav_temp,axis=1))
+            hw_fft_total_freq += fft_total_freq
+            hw_fft_stand_freq += fft_stand_freq
+            hw_fft_trav_freq += fft_trav_freq
 
     # now take same FFTs for all 20 day periods in the interval. (general climate)
     # consider taking all 20 day intervals NOT covered by heatwaves.
@@ -104,14 +122,20 @@ for k in range(t_data.shape[0]):
         all_days_fft_total_temp, all_days_fft_stand_temp, all_days_fft_trav_temp = \
           wnfreq.calc_wnfreq_spectrum(geoheight[i:i+N_days,:],wn_max)
         Total_N_ints += 1
-        # these should acutally be inverse ffts i think
-        all_days_fft_total_wn += np.absolute(np.sum(all_days_fft_total_temp,axis=0))
-        all_days_fft_stand_wn += np.absolute(np.sum(all_days_fft_stand_temp,axis=0))
-        all_days_fft_trav_wn += np.absolute(np.sum(all_days_fft_trav_temp,axis=0))
+        # calculate 1D freq/wn ffts
+        fft_total_freq, fft_total_wn = fft_1d_freq_wn(all_days_fft_total_temp,wn_max,z_lon.size)
+        fft_stand_freq, fft_stand_wn = fft_1d_freq_wn(all_days_fft_stand_temp,wn_max,z_lon.size)
+        fft_trav_freq, fft_trav_wn = fft_1d_freq_wn(all_days_fft_trav_temp,wn_max,z_lon.size)
+        # add to total
+        all_days_fft_total_wn += fft_total_wn
+        all_days_fft_stand_wn += fft_stand_wn
+        all_days_fft_trav_wn += fft_trav_wn
 
-        all_days_fft_total_freq += np.absolute(np.sum(all_days_fft_total_temp,axis=1))
-        all_days_fft_stand_freq += np.absolute(np.sum(all_days_fft_stand_temp,axis=1))
-        all_days_fft_trav_freq += np.absolute(np.sum(all_days_fft_trav_temp,axis=1))
+        all_days_fft_total_freq += fft_total_freq
+        all_days_fft_stand_freq += fft_stand_freq
+        all_days_fft_trav_freq += fft_trav_freq
+
+
 
     print float(k)*100/t_data.shape[0], '%'
 
