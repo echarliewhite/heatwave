@@ -17,7 +17,7 @@ z_data, z_time, z_plev, z_lat, z_lon = hwt.import_nc_dir('/Users/charliewhite/Do
 t_data, t_time, t_plev, t_lat, t_lon = hwt.import_nc_dir('/Users/charliewhite/Documents/Year4/Thesis/climdata/ERAInterim/dailymean/t/summersurface/', 'T_GDS0_ISBL', 1000.0)
 
 # get heat wave data
-N_points = 0.05*t_lat.size*t_lon.size
+N_points = 0.05*t_lat.size*t_lon.size # 5% of grid points
 heat_wave_dict = hwt.find_heat_waves(t_data,97.5,t_lat,t_lon,N_points,5)
 
 z_clim = np.average(z_data, axis=0) # climatology

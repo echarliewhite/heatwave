@@ -3,8 +3,9 @@ File: find_heat_waves.py
 Author: Charlie White
 Email: charlie.white@mail.utoronto.ca
 Github: echarliewhite
-Description: This script contains functions that can identify heat waves based
-on a threshold temperature defined relative to historical temperatures.
+Description: This module contains functions that can identify heat waves based
+on a threshold temperature defined relative to historical temperatures. A class
+for storing heat waves and plotting functions are included as well.
 """
 import numpy as np
 import netCDF4 as nc4
@@ -127,6 +128,8 @@ def find_heat_waves(temps,threshold,lat,lon,N_points,deg_move):
                                 next_day_hot = False
                             else:
                                 k += 1
+                                if j + k >= temps.shape[1]:
+                                    next_day_hot = False
                                 lat_av, lon_av = lat_av_next, lon_av_next
                         else: next_day_hot = False
 
