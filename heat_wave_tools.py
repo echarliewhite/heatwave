@@ -11,7 +11,9 @@ import numpy as np
 import netCDF4 as nc4
 import os
 import string
-
+from mpl_toolkits.basemap import Basemap
+from matplotlib.offsetbox import AnchoredOffsetbox, AnchoredText, TextArea
+import matplotlib.pyplot as plt
 
 class heat_wave:
     """
@@ -24,14 +26,26 @@ class heat_wave:
         self.lat = lat # average latitude of grid points above temp threshold
         self.lon = lon # average longitude of grid points above temp threshold
         
+class AnchoredText(AnchoredOffsetbox):
+    """
+    for adding labels within figures
+    """
+    def __init__(self, s, loc, pad=0.4, borderpad=0.5, prop=None, frameon=True):
+        self.txt = TextArea(s,minimumdescent=False)
 
-def import_nc_dir(directory, var_name, pressure):
+        super(AnchoredText, self).__init__(loc, pad=pad, borderpad=borderpad,
+                                       child=self.txt,
+                                       prop=prop,
+                                       frameon=frameon)
+
+def import_nc_dir(directory, var_name, pressure1=1000, pressure2=None):
     """
     This function will import the data in the netcdf files in the given
     directory, put it all in one array, and return it along with arrays
     containing longitude, latitude, pressure level, and date/time information.
     The variable of interest (e.g. geo height, temperature) must be specified
-    according to its name in the .nc file.
+    according to its name in the .nc file. To reduce the amount of data
+    imported, a single pressure level or a range must be specified.
     """
     
     files = os.listdir(directory)
@@ -43,9 +57,15 @@ def import_nc_dir(directory, var_name, pressure):
     # determine the shape of the data
     nc = nc4.Dataset(directory+files[0])
     plev = nc.variables['lv_ISBL1'][:]
-    p_ind = np.where(plev==pressure)[0]
-    data = nc.variables[var_name][:][:,p_ind,:,:]
-    time = nc.variables['initial_time0_hours'][:]
+    p_ind1 = np.where(plev==pressure1)[0][0] # check that this works
+    if pressure2 is None:
+        p_ind2 = p_ind1 + 1
+    else:
+        p_ind2 = np.where(plev==pressure2)[0][0] + 1
+    plev = plev[p_ind1:p_ind2]
+    data = nc.variables[var_name][:][:,p_ind1:p_ind2,:,:]
+    # have to add hours/year after year 0 to get absolute time
+    time = nc.variables['initial_time0_hours'][:] 
     lat = nc.variables['g0_lat_2'][:]
     lon = nc.variables['g0_lon_3'][:]
 
@@ -58,7 +78,7 @@ def import_nc_dir(directory, var_name, pressure):
     # extract temperature data for each year and put in one array
     for i in range(len(files)):
         nc = nc4.Dataset(directory+files[i])
-        data[i] = nc.variables[var_name][:][:,p_ind,:,:]
+        data[i] = nc.variables[var_name][:][:,p_ind1:p_ind2,:,:]
         nc.close()
 
     # add in year as a returned variable
@@ -145,4 +165,70 @@ def find_heat_waves(temps,threshold,lat,lon,N_points,deg_move):
                     # when heat wave ends start looking for heat waves again
                     if k == 1: prev_day_heat_wave = False
     return heat_wave_dict
+
+def plot_evo(data, year, day0, lat, lon, center=None, days=[0]):
+    """
+    This function will create a set of plots (e.g.
+    total/standing/travelling) side by side showing the evolution of the data
+    sets.
+
+    data - array containing data with dimensions 
+            [# of datasets,year,day,plev=1,lat,lon]
+    year - year 0 refers to first index in data (e.g. don't use 1982, use 3 if
+            data starts in 1979)
+    day0 - what day to center the evolution on
+    lat - array of latitudes corresponding to data
+    lon - array of longitudes corresponding to data
+    center - a point to plot on the map (e.g. center of heat wave)
+    days - list of integers representing days relative to day0 for which to
+            create plots
+
+    Returns:
+    fig - a pyplot figure
+    ax - an array of pyplot axes with dimensions [days.size,# of datasets]
+    """
+
+    # create figure/axes
+    fig, ax = plt.subplots(len(days),data.shape[0],figsize=(17,11))
+
+    m = Basemap(projection='cyl',llcrnrlat=np.min(lat),\
+                urcrnrlat=np.max(lat),llcrnrlon=np.min(lon),\
+                urcrnrlon=np.max(lon),resolution='c')
+    # make x,y grid from lat,lon
+    lon_grid,lat_grid = np.meshgrid(lon,lat)
+    x,y = m(lon_grid,lat_grid)
+
+    # fill in individual plots
+    for i in range(data.shape[0]):
+        for j in range(len(days)):
+            # set current axes
+            plt.sca(ax[j,i])
+
+            # check that the day is in range
+            if 0 <= day0 + days[j] < data.shape[2]:
+                plot_data = np.real(data[i][year][day0+days[j]][0])
+                # draw map features
+                m.drawcoastlines(linewidth=1.25)
+                m.fillcontinents()
+                m.drawparallels(np.arange(np.min(lat),np.max(lat),5.))
+                m.drawmeridians(np.arange(np.min(lon),np.max(lon),10.))
+                m.drawmapboundary()
+                # contour levels
+                clevs = np.arange(np.min(plot_data),np.max(plot_data),
+                            (np.max(plot_data) - np.min(plot_data))/20.0)
+                # fit plot to axis
+                # plot contours
+                cs = m.contour(x,y,plot_data,clevs,linewidths=1,colors='k')
+                plt.clabel(cs,inline=1,fontsize=10)
+                # label day number
+                day_lab = AnchoredText('Day %d' % days[j], loc=1, frameon=True)
+                day_lab.patch.set_boxstyle('round,pad=0.,rounding_size=0.2')
+                ax[j,i].add_artist(day_lab)
+                # plot center point
+                if center is not None:
+                    plt.plot(center[1],center[0],'ro')
+            else:
+                plt.text(0.2,0.5,'Date out of range')
+    plt.tight_layout() 
+    return fig, ax
 

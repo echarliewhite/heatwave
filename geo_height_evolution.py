@@ -9,7 +9,6 @@ components of geopotential height for a specified heat wave.
 import numpy as np
 import heat_wave_tools as hwt
 import wnfreq_routines_2_0 as wnfreq
-from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
 
 z_data, z_time, z_plev, z_lat, z_lon = hwt.import_nc_dir('/Users/charliewhite/Documents/Year4/Thesis/climdata/ERAInterim/dailymean/z/midlatitude/', 'Z_GDS0_ISBL', 300.0)
@@ -34,53 +33,41 @@ z_anom_standing = wnfreq.invert_wnfreq_spectrum(
 z_anom_travelling = wnfreq.invert_wnfreq_spectrum(
         z_anom_trans_travelling,1,wn_max,z_lon.size,tol=1e6)
 
-# day0 for a heat wave
-hwave = heat_wave_dict.values()[1]
-min_lat_ind = np.where(z_lat==np.min(t_lat))[0][0]
-max_lat_ind = np.where(z_lat==np.max(t_lat))[0][0]
-min_lon_ind = np.where(z_lon==np.min(t_lon))[0][0]
-max_lon_ind = np.where(z_lon==np.max(t_lon))[0][0]
-z_anom_standing_day0 = z_anom_standing[hwave.year,hwave.start,0,
-        :,min_lon_ind:max_lon_ind+1]
-z_anom_travelling_day0 = z_anom_travelling[hwave.year,hwave.start,0,
-        :,min_lon_ind:max_lon_ind+1]
+# store all 3 data sets in one array for plotting function
+# from west pacific to east atlantic
+west_lim = np.where(z_lon==-180.)[0][0]
+east_lim = np.where(z_lon==-30.)[0][0]
+z_anom_all = np.zeros((3,)+z_anom.shape,dtype='complex128')
+z_anom_all = z_anom_all[:,:,:,:,:,west_lim:east_lim]
+z_anom_all[0] = z_anom[:,:,:,:,west_lim:east_lim]
+z_anom_all[1] = z_anom_standing[:,:,:,:,west_lim:east_lim]
+z_anom_all[2] = z_anom_travelling[:,:,:,:,west_lim:east_lim]
 
-# llcrnrlat,llcrnrlon,urcrnrlat,urcrnrlon
-# are the lat/lon values of the lower left and upper right corners
-# of the map.
-# resolution = 'c' means use crude resolution coastlines.
-m = Basemap(projection='cyl',llcrnrlat=np.min(t_lat),urcrnrlat=np.max(t_lat),\
-            llcrnrlon=np.min(t_lon),urcrnrlon=np.max(t_lon),resolution='c')
-# contour levels
-clevs = np.arange(np.min(z_anom_standing),np.max(z_anom_standing),
-        (np.max(z_anom_standing) - np.min(z_anom_standing))/100.0)
-# x,y grid from lat, lon
-lons, lats = np.meshgrid(t_lon,t_lat)
-x, y = m(lons, lats)
-# figure
-fig, ax = plt.subplots(1,2)
-# contours
-plt.sca(ax[0])
-cs = m.contour(x,y,z_anom_standing_day0,clevs,colors='k',linewidths=1.)
-plt.clabel(cs, inline=1, fontsize=10)
-m.drawcoastlines(linewidth=1.25)
-m.fillcontinents(color='0.5')
-# draw parallels and meridians.
-m.drawparallels(np.arange(np.min(t_lat),np.max(t_lat),5.),labels=[1,1,0,0,])
-m.drawmeridians(np.arange(np.min(t_lon),np.max(t_lon),10.),labels=[0,0,0,1])
-m.drawmapboundary()
-plt.title("Day 0 Standing Geo Height Anomaly")
+# create evolution plots for each heat wave
+days = [-5,-3,0,3,5]
+evo_plot_dict = dict()
+# for key in heat_wave_dict.keys():
+#     hwave = heat_wave_dict[key]
+#     year = hwave.year
+#     day0 = hwave.start
+#     center = [hwave.lat,hwave.lon]
+#     fig, ax = hwt.plot_evo(z_anom_all,year,day0,\
+#                             z_lat[west_lim:east_lim],z_lon,center,days)
+#     evo_plot_dict[key] = (fig, ax)
+#     ax[0,0].set_title(key + 'Total Geoheight')
+#     ax[0,1].set_title(key + 'Standing Geoheight')
+#     ax[0,2].set_title(key + 'Travelling Geoheight')
+key = heat_wave_dict.keys()[0]
+hwave = heat_wave_dict[key]
+year = hwave.year
+day0 = hwave.start
+center = [hwave.lat,hwave.lon]
+fig, ax = hwt.plot_evo(z_anom_all,year,day0,\
+        z_lat,z_lon[west_lim:east_lim],center,days)
+evo_plot_dict[key] = (fig, ax)
 
-plt.sca(ax[1])
-cs = m.contour(x,y,z_anom_travelling_day0,clevs,colors='k',linewidths=1.)
-plt.clabel(cs, inline=1, fontsize=10)
-m.drawcoastlines(linewidth=1.25)
-m.fillcontinents(color='0.5')
-# draw parallels and meridians.
-m.drawparallels(np.arange(np.min(t_lat),np.max(t_lat),5.),labels=[1,1,0,0,])
-m.drawmeridians(np.arange(np.min(t_lon),np.max(t_lon),10.),labels=[0,0,0,1])
-m.drawmapboundary()
-plt.title("Day 0 Travelling Geo Height Anomaly")
+ax[0,0].set_title(key + ' Total Geoheight')
+ax[0,1].set_title(key + ' Standing Geoheight')
+ax[0,2].set_title(key + ' Travelling Geoheight')
+
 plt.show()
-
-import pdb; pdb.set_trace()
