@@ -234,7 +234,7 @@ def plot_evo(data, year, day0, lat, lon, center=None, days=[0], show_map=True):
     ax - an array of pyplot axes with dimensions [days.size,# of datasets]
     """
     # create figure/axes
-    fig, ax = plt.subplots(len(days),data.shape[0],figsize=(17,11),
+    fig, ax = plt.subplots(len(days),data.shape[0],figsize=(17,12),
                             sharex=True,sharey=True)
 
     # create basemap instance
@@ -247,8 +247,8 @@ def plot_evo(data, year, day0, lat, lon, center=None, days=[0], show_map=True):
     # extract data in the range of interest for generating contours
     data_chunk = np.real(data[:,year,day0+days[0]:day0+days[-1]])
     # contour levels
-    clevs = np.arange(np.min(data_chunk),np.max(data_chunk),
-                        (np.max(data_chunk) - np.min(data_chunk))/25.0)
+    extreme = np.max(np.absolute(data_chunk))
+    clevs = np.linspace(-((extreme+10)//10)*10,((extreme+10)//10)*10,num=20)
 
     # fill in individual plots
     for i in range(data.shape[0]):
@@ -267,7 +267,7 @@ def plot_evo(data, year, day0, lat, lon, center=None, days=[0], show_map=True):
                 m.drawmapboundary()
                 # fit plot to axis
                 # plot contours
-                cs = m.contourf(x,y,plot_data,clevs,linewidths=1,cmap='bwr')
+                cs = m.contourf(x,y,plot_data,clevs,cmap='bwr')
                 cs = m.contour(x,y,plot_data,clevs,linewidths=1,colors='k')
                 # label day number
                 day_lab = AnchoredText('Day %d' % days[j], loc=1, frameon=True)
@@ -282,3 +282,120 @@ def plot_evo(data, year, day0, lat, lon, center=None, days=[0], show_map=True):
     plt.tight_layout() 
     return fig, ax
 
+def plot_meridional_mean_evo(z_data, z_lon, t_data, t_lon, year,
+                             day0, center_lon=None, day_range=[-30,30]):
+    """
+    This function will create a set of plots showing the day by day evolution
+    of the meridional average of the total, standing, and travelling geoheight
+    anomaly alongside the meridional temperature average. For reference see
+    fig. 1 of Kushner/Watt-Meyer's decomposition paper.
+
+    z_data - array containing z data with dimensions [datasets=3,years,days,plev=1,z_lat,z_lon]
+             order of datasets - total anomaly, standing, travelling
+    t_data - array containing T data with dimensions [years,days,plev=1,t_lat,t_lon]
+    z_lon, t_lon - coordinate information for corresponding array
+    year - the year in which the dates to be plotted reside
+    day0 - heat wave start date, or other date upon which to center the plots
+    center_lon - a longitude to identify with a line on the plots
+    day_range - number of days to plot on either side of day0.
+
+    Returns:
+    fig - a pyplot figure
+    ax - an array of 4 pyplot axes
+    """
+    # create figure/axes
+    fig = plt.figure(figsize=(17,11))
+
+    left = 0.1
+    bottom = 0.1
+    width = 0.8
+    height = 0.8
+
+    total_lon_width = z_lon.size*3 + t_lon.size
+    z_panel_width = z_lon.size*width/total_lon_width
+    t_panel_width = t_lon.size*width/total_lon_width
+
+    z_rect1 = [left, bottom, z_panel_width, height]
+    t_rect = [left+z_panel_width, bottom, t_panel_width, height]
+    z_rect2 = [left+z_panel_width+t_panel_width, bottom, z_panel_width, height]
+    z_rect3 = [left+z_panel_width*2+t_panel_width, bottom, z_panel_width, height]
+    
+    z_ax1 = fig.add_axes(z_rect1)
+    t_ax = fig.add_axes(t_rect, sharey=z_ax1)
+    z_ax2 = fig.add_axes(z_rect2, sharey=z_ax1)
+    z_ax3 = fig.add_axes(z_rect3, sharey=z_ax1)
+
+    # colorbar axes
+    z_cax_rect = [left+width, bottom, (1. - (left+width))/4., height]
+    t_cax_rect = [left+width+2*(1. - (left+width))/4., bottom, (1. - (left+width))/4., height]
+
+    z_cax = fig.add_axes(z_cax_rect)
+    t_cax = fig.add_axes(t_cax_rect)
+
+    # take meridional averages
+    z_data_mer_mean = np.average(np.real(z_data),axis=4)
+    t_data_mer_mean = np.average(t_data,axis=3)
+    
+    z_anom_mer_mean = np.squeeze(z_data_mer_mean[0,year,day0+day_range[0]:day0+day_range[1],:,:])
+    t_anom_mer_mean = np.squeeze(t_data_mer_mean[year,day0+day_range[0]:day0+day_range[1],:,:])
+    z_anom_standing_mer_mean = np.squeeze(z_data_mer_mean[1,year,day0+day_range[0]:day0+day_range[1],:,:])
+    z_anom_travelling_mer_mean = np.squeeze(z_data_mer_mean[2,year,day0+day_range[0]:day0+day_range[1],:,:])
+
+    # set up contour plot
+    days = np.arange(day_range[0],day_range[1])
+    zx,zy = np.meshgrid(z_lon,days)
+    tx,ty = np.meshgrid(t_lon,days)
+
+    z_extreme = np.max(np.absolute(z_data_mer_mean))
+    z_clevs = np.linspace(-((z_extreme+10)//10)*10,((z_extreme+10)//10)*10,num=20)
+    t_extreme = np.max(np.absolute(t_anom_mer_mean))
+    t_clevs = np.linspace(-((t_extreme+2)//2)*2,((t_extreme+2)//2)*2,num=10)
+
+    z_cs1 = z_ax1.contourf(zx,zy,z_anom_mer_mean,z_clevs,cmap='bwr')
+    t_cs = t_ax.contourf(tx,ty,t_anom_mer_mean,t_clevs,cmap='autumn')
+    z_cs2 = z_ax2.contourf(zx,zy,z_anom_standing_mer_mean,z_clevs,cmap='bwr')
+    z_cs3 = z_ax3.contourf(zx,zy,z_anom_travelling_mer_mean,z_clevs,cmap='bwr')
+
+    # identify center and day0
+    z_ax1.hlines(0,z_lon[0],z_lon[-1],linestyles='dashed')
+    t_ax.hlines(0,t_lon[0],t_lon[-1],linestyles='dashed')
+    z_ax2.hlines(0,z_lon[0],z_lon[-1],linestyles='dashed')
+    z_ax3.hlines(0,z_lon[0],z_lon[-1],linestyles='dashed')
+
+    if center_lon is not None:
+        z_ax1.vlines(center_lon,days[0],days[-1],linestyles='dashed')
+        t_ax.vlines(center_lon,days[0],days[-1],linestyles='dashed')
+        z_ax2.vlines(center_lon,days[0],days[-1],linestyles='dashed')
+        z_ax3.vlines(center_lon,days[0],days[-1],linestyles='dashed')
+
+    # colorbars
+    plt.colorbar(z_cs1, cax=z_cax, orientation='vertical')
+    plt.colorbar(t_cs, cax=t_cax, orientation='vertical')
+
+    # labels and ticks
+    z_ax1.xaxis.set_major_locator(plt.MultipleLocator(30.0))
+    t_ax.xaxis.set_major_locator(plt.MultipleLocator(30.0))
+    z_ax2.xaxis.set_major_locator(plt.MultipleLocator(30.0))
+    z_ax3.xaxis.set_major_locator(plt.MultipleLocator(30.0))
+
+    z_ax1.yaxis.set_major_locator(plt.MultipleLocator(3.0))
+    plt.setp(t_ax.get_yticklabels(), visible=False)
+    plt.setp(z_ax2.get_yticklabels(), visible=False)
+    plt.setp(z_ax3.get_yticklabels(), visible=False)
+
+    z_ax1.set_title('Total Geoheight Anomaly',fontsize=12)
+    t_ax.set_title('Temperature Anomaly',fontsize=12)
+    z_ax2.set_title('Standing Geoheight Anomaly',fontsize=12)
+    z_ax3.set_title('Travelling Geoheight Anomaly',fontsize=12)
+
+    z_ax1.set_xlabel('Longitude')
+    t_ax.set_xlabel('Longitude')
+    z_ax2.set_xlabel('Longitude')
+    z_ax3.set_xlabel('Longitude')
+
+    z_ax1.set_ylabel('Day #')
+    
+    plt.tick_params(axis='both', which='major', labelsize='8')
+
+    ax = [z_ax1, t_ax, z_ax2, z_ax3]
+    return fig, ax

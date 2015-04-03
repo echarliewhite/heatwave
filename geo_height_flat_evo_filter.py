@@ -58,6 +58,9 @@ gc.collect()
 
 # Compute FFT and Inverse FFT
 wn_max = 15
+filter_wn = 5
+z_filter = np.zeros((z_anom.shape[1],z_anom.shape[2],z_anom.shape[3],wn_max))
+z_filter[:,:,:,filter_wn-1] = np.ones(z_filter.shape[0:3])
 z_anom_standing = np.zeros(z_anom.shape, dtype='complex128')
 z_anom_travelling = np.zeros(z_anom.shape, dtype='complex128')
 
@@ -66,12 +69,17 @@ for i in range(z_anom.shape[0]):
     sys.stdout.flush()
     z_anom_trans, z_anom_trans_standing, z_anom_trans_travelling = \
             wnfreq.calc_wnfreq_spectrum(z_anom[i], wn_max)
+
+    z_anom_trans *= z_filter
+    z_anom[i] = wnfreq.invert_wnfreq_spectrum(
+            z_anom_trans,1,wn_max,z_lon.size,tol=1e6)
     sys.stdout.write('Done\n')
     del z_anom_trans
     gc.collect()
 
     sys.stdout.write('Computing Inverse FFT of Standing Component '+str(i+1)+'/'+str(z_anom.shape[0])+'...   ')
     sys.stdout.flush()
+    z_anom_trans_standing *= z_filter
     z_anom_standing[i] = wnfreq.invert_wnfreq_spectrum(
             z_anom_trans_standing,1,wn_max,z_lon.size,tol=1e6)
     sys.stdout.write('Done\n')
@@ -80,6 +88,7 @@ for i in range(z_anom.shape[0]):
 
     sys.stdout.write('Computing Inverse FFT of Travelling Component '+str(i+1)+'/'+str(z_anom.shape[0])+'...   ')
     sys.stdout.flush()
+    z_anom_trans_travelling *= z_filter
     z_anom_travelling[i] = wnfreq.invert_wnfreq_spectrum(
             z_anom_trans_travelling,1,wn_max,z_lon.size,tol=1e6)
     sys.stdout.write('Done\n')
@@ -112,10 +121,11 @@ for hwave in heat_wave_dict.values():
                     z_lon[plot_lon_bound[0]:plot_lon_bound[1]], t_anom, t_lon,
                     year, day0, center_lon=hwave_lon,
                     day_range=[-comp_length//2,comp_length//2])
+        fig.set_size_inches(17,11,forward=True)
         fig.suptitle('Year '+str(year)+' Day '+str(day0)+' Geopotential Height Anomaly')
         #if show==True: fig.show()
         #show==False
-        fig.savefig('output/flat_year'+str(year)+'day'+str(day0)+'.png',
+        fig.savefig('output/wn'+str(filter_wn)+'year'+str(year)+'day'+str(day0)+'.png',
                     format='png')
 
 # plot composite
@@ -217,8 +227,7 @@ fig, ax = hwt.plot_meridional_mean_evo(
                 z_lon[plot_lon_bound[0]:plot_lon_bound[1]], t_anom_comp, t_lon,
                 0, comp_length//2, center_lon=center[1],
                 day_range=[-comp_length//2,comp_length//2])
-fig.suptitle('Composite Geopotential Height Anomaly')
-fig.savefig('output/flat_composite.png',
+fig.savefig('output/march24composite.png',
             format='png')
 
 plt.show()

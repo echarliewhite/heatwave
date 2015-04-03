@@ -47,29 +47,33 @@ gc.collect()
 
 # Compute FFT and Inverse FFT
 wn_max = 15
-sys.stdout.write('Computing FFT...   ')
-sys.stdout.flush()
-z_anom_trans, z_anom_trans_standing, z_anom_trans_travelling = \
-        wnfreq.calc_wnfreq_spectrum(z_anom, wn_max)
-sys.stdout.write('Done\n')
-del z_anom_trans
-gc.collect()
+z_anom_standing = np.zeros(z_anom.shape, dtype='complex128')
+z_anom_travelling = np.zeros(z_anom.shape, dtype='complex128')
 
-sys.stdout.write('Computing Inverse FFT of Standing Component...   ')
-sys.stdout.flush()
-z_anom_standing = wnfreq.invert_wnfreq_spectrum(
-        z_anom_trans_standing,1,wn_max,z_lon.size,tol=1e6)
-sys.stdout.write('Done\n')
-del z_anom_trans_standing
-gc.collect()
+for i in range(z_anom.shape[0]):
+    sys.stdout.write('Computing FFT '+str(i+1)+'/'+str(z_anom.shape[0])+'...   ')
+    sys.stdout.flush()
+    z_anom_trans, z_anom_trans_standing, z_anom_trans_travelling = \
+            wnfreq.calc_wnfreq_spectrum(z_anom[i], wn_max)
+    sys.stdout.write('Done\n')
+    del z_anom_trans
+    gc.collect()
 
-sys.stdout.write('Computing Inverse FFT of Travelling Component...   ')
-sys.stdout.flush()
-z_anom_travelling = wnfreq.invert_wnfreq_spectrum(
-        z_anom_trans_travelling,1,wn_max,z_lon.size,tol=1e6)
-sys.stdout.write('Done\n')
-del z_anom_trans_travelling
-gc.collect()
+    sys.stdout.write('Computing Inverse FFT of Standing Component '+str(i+1)+'/'+str(z_anom.shape[0])+'...   ')
+    sys.stdout.flush()
+    z_anom_standing[i] = wnfreq.invert_wnfreq_spectrum(
+            z_anom_trans_standing,1,wn_max,z_lon.size,tol=1e6)
+    sys.stdout.write('Done\n')
+    del z_anom_trans_standing
+    gc.collect()
+
+    sys.stdout.write('Computing Inverse FFT of Travelling Component '+str(i+1)+'/'+str(z_anom.shape[0])+'...   ')
+    sys.stdout.flush()
+    z_anom_travelling[i] = wnfreq.invert_wnfreq_spectrum(
+            z_anom_trans_travelling,1,wn_max,z_lon.size,tol=1e6)
+    sys.stdout.write('Done\n')
+    del z_anom_trans_travelling
+    gc.collect()
 
 # create composite geopotential for heat waves
 comp_length = 30 # number of days centered on day 0 (even # only)
@@ -114,7 +118,6 @@ for hwave in heat_wave_dict.values():
         lon_ind = np.searchsorted(z_lon,hwave_lon,sorter=z_lon_sort)
         lat_pad = lat_ind - center_ind[0]
         lon_pad = lon_ind - center_ind[1]
-        print lat_pad,lon_pad
         lat_bound = [max(0,lat_pad),min(z_lat.size,z_lat.size+lat_pad)]
         lon_bound = [max(0,lon_pad),min(z_lon.size,z_lon.size+lon_pad)]
         inner_lat_bound = [max(lat_bound[0],inner_lat_bound[0]),
@@ -162,14 +165,18 @@ z_anom_comp_all = np.zeros((3,)+z_anom_comp.shape,dtype='complex128')
 # z_anom_comp_all[0] = z_anom_comp[:,:,:,north_lim:south_lim,west_lim:east_lim]
 # z_anom_comp_all[1] = z_anom_comp_standing[:,:,:,north_lim:south_lim,west_lim:east_lim]
 # z_anom_comp_all[2] = z_anom_comp_travelling[:,:,:,north_lim:south_lim,west_lim:east_lim]
+
+plot_lon_bound = [np.searchsorted(z_lon,-180,sorter=z_lon_sort),
+                 np.searchsorted(z_lon,-30,sorter=z_lon_sort)]
+
 z_anom_comp_all = z_anom_comp_all[:,:,:,:,inner_lat_bound[0]:inner_lat_bound[1],
-                                  inner_lon_bound[0]:inner_lon_bound[1]]
+                                  plot_lon_bound[0]:plot_lon_bound[1]]
 z_anom_comp_all[0] = z_anom_comp[:,:,:,inner_lat_bound[0]:inner_lat_bound[1],
-                                 inner_lon_bound[0]:inner_lon_bound[1]]
+                                 plot_lon_bound[0]:plot_lon_bound[1]]
 z_anom_comp_all[1] = z_anom_comp_standing[:,:,:,inner_lat_bound[0]:inner_lat_bound[1],
-                                          inner_lon_bound[0]:inner_lon_bound[1]]
+                                          plot_lon_bound[0]:plot_lon_bound[1]]
 z_anom_comp_all[2] = z_anom_comp_travelling[:,:,:,inner_lat_bound[0]:inner_lat_bound[1],
-                                            inner_lon_bound[0]:inner_lon_bound[1]]
+                                            plot_lon_bound[0]:plot_lon_bound[1]]
 
 # create evolution plots for composite heat wave
 days = [-6,-3,0,3,6]
@@ -177,13 +184,14 @@ days = [-6,-3,0,3,6]
 # fig, ax = hwt.plot_evo(z_anom_comp_all,0,comp_length/2,\
 #         z_lat[north_lim:south_lim],z_lon[west_lim:east_lim],
 #         center,days,show_map=False)
-import pdb; pdb.set_trace()
 fig, ax = hwt.plot_evo(z_anom_comp_all,0,comp_length/2,\
-        z_lat[inner_lat_bound[0]:inner_lat_bound[1]],z_lon[inner_lon_bound[0]:inner_lon_bound[1]],
+        z_lat[inner_lat_bound[0]:inner_lat_bound[1]],z_lon[plot_lon_bound[0]:plot_lon_bound[1]],
         center,days,show_map=False)
 
 ax[0,0].set_title('Composite Total Geoheight')
 ax[0,1].set_title('Composite Standing Geoheight')
 ax[0,2].set_title('Composite Travelling Geoheight')
+
+fig.savefig('output/evo_composite.png',format='png')
 
 plt.show()

@@ -46,29 +46,34 @@ gc.collect()
 
 # Compute FFT and Inverse FFT
 wn_max = 15
-sys.stdout.write('Computing FFT...   ')
-sys.stdout.flush()
-z_anom_trans, z_anom_trans_standing, z_anom_trans_travelling = \
-        wnfreq.calc_wnfreq_spectrum(z_anom, wn_max)
-sys.stdout.write('Done\n')
-del z_anom_trans
-gc.collect()
+z_anom_standing = np.zeros(z_anom.shape, dtype='complex128')
+z_anom_travelling = np.zeros(z_anom.shape, dtype='complex128')
 
-sys.stdout.write('Computing Inverse FFT of Standing Component...   ')
-sys.stdout.flush()
-z_anom_standing = wnfreq.invert_wnfreq_spectrum(
-        z_anom_trans_standing,1,wn_max,z_lon.size,tol=1e6)
-sys.stdout.write('Done\n')
-del z_anom_trans_standing
-gc.collect()
+for i in range(z_anom.shape[0]):
+    sys.stdout.write('Computing FFT '+str(i+1)+'/'+str(z_anom.shape[0])+'...   ')
+    sys.stdout.flush()
+    z_anom_trans, z_anom_trans_standing, z_anom_trans_travelling = \
+            wnfreq.calc_wnfreq_spectrum(z_anom[i], wn_max)
+    sys.stdout.write('Done\n')
+    del z_anom_trans
+    gc.collect()
 
-sys.stdout.write('Computing Inverse FFT of Travelling Component...   ')
-sys.stdout.flush()
-z_anom_travelling = wnfreq.invert_wnfreq_spectrum(
-        z_anom_trans_travelling,1,wn_max,z_lon.size,tol=1e6)
-sys.stdout.write('Done\n')
-del z_anom_trans_travelling
-gc.collect()
+    sys.stdout.write('Computing Inverse FFT of Standing Component '+str(i+1)+'/'+str(z_anom.shape[0])+'...   ')
+    sys.stdout.flush()
+    z_anom_standing[i] = wnfreq.invert_wnfreq_spectrum(
+            z_anom_trans_standing,1,wn_max,z_lon.size,tol=1e6)
+    sys.stdout.write('Done\n')
+    del z_anom_trans_standing
+    gc.collect()
+
+    sys.stdout.write('Computing Inverse FFT of Travelling Component '+str(i+1)+'/'+str(z_anom.shape[0])+'...   ')
+    sys.stdout.flush()
+    z_anom_travelling[i] = wnfreq.invert_wnfreq_spectrum(
+            z_anom_trans_travelling,1,wn_max,z_lon.size,tol=1e6)
+    sys.stdout.write('Done\n')
+    del z_anom_trans_travelling
+    gc.collect()
+
 
 print 'Preparing for plotting...'
 # create composite geopotential for heat waves
