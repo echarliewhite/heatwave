@@ -212,7 +212,9 @@ def find_heat_waves(temps,threshold,lat,lon,N_points,deg_move):
     sys.stdout.flush()
     return heat_wave_dict
 
-def plot_evo(data, year, day0, lat, lon, center=None, days=[0], show_map=True):
+def plot_evo(data, year, day0, lat, lon, center=None, days=[0], show_map=True,
+             cmap=plt.cm.RdBu_r,clev_bound=None, clev_num=20, show_day=True,
+             lat_ticks=10, lon_ticks=30):
     """
     This function will create a set of plots (e.g.
     total/standing/travelling) side by side showing the evolution of the data
@@ -234,8 +236,10 @@ def plot_evo(data, year, day0, lat, lon, center=None, days=[0], show_map=True):
     ax - an array of pyplot axes with dimensions [days.size,# of datasets]
     """
     # create figure/axes
-    fig, ax = plt.subplots(len(days),data.shape[0],figsize=(17,12),
-                            sharex=True,sharey=True)
+    fig, ax = plt.subplots(len(days), data.shape[0],
+                            subplot_kw={'frame_on':True}, facecolor='w',
+                            figsize=(17,11))
+    marker_style = dict(marker='o', color='black', markersize=10)
 
     # create basemap instance
     m = Basemap(projection='cyl',llcrnrlat=np.min(lat),\
@@ -244,43 +248,72 @@ def plot_evo(data, year, day0, lat, lon, center=None, days=[0], show_map=True):
     # make x,y grid from lat,lon
     lon_grid,lat_grid = np.meshgrid(lon,lat)
     x,y = m(lon_grid,lat_grid)
-    # extract data in the range of interest for generating contours
-    data_chunk = np.real(data[:,year,day0+days[0]:day0+days[-1]])
     # contour levels
-    extreme = np.max(np.absolute(data_chunk))
-    clevs = np.linspace(-((extreme+10)//10)*10,((extreme+10)//10)*10,num=20)
+    if clev_bound is None:
+        # extract data in the range of interest for generating contours
+        if len(days) == 1:
+            data_chunk = np.real(data[:,year,day0+days[0]])
+        else:
+            data_chunk = np.real(data[:,year,day0+days[0]:day0+days[-1]])
+        extreme = np.max(np.absolute(data_chunk))
+        clevs = np.linspace(-((extreme+10)//10)*10,((extreme+10)//10)*10,
+                            num=clev_num)
+    else:
+        clevs = np.linspace(clev_bound[0],clev_bound[1],num=clev_num)
 
     # fill in individual plots
     for i in range(data.shape[0]):
         for j in range(len(days)):
             # set current axes
-            plt.sca(ax[j,i])
+            if len(days) == 1:
+                if data.shape[0] == 1:
+                    plt.sca(ax)
+                else:
+                    plt.sca(ax[i])
+            else:
+                if data.shape[0] == 1:
+                    plt.sca(ax[j])
+                else:
+                    plt.sca(ax[j,i])
 
             # check that the day is in range
             if 0 <= day0 + days[j] < data.shape[2]:
                 plot_data = np.real(data[i][year][day0+days[j]][0])
                 if show_map:
                     # draw map features
-                    m.drawcoastlines(linewidth=1.25)
-                m.drawparallels(np.arange(np.min(lat),np.max(lat),5.))
-                m.drawmeridians(np.arange(np.min(lon),np.max(lon),10.))
-                m.drawmapboundary()
+                    m.drawcoastlines(linewidth=2)
+                    m.drawcountries(linewidth=2)
+
+                if i == 0:
+                    m.drawparallels(np.arange((np.min(lat)//10)*10+10,np.max(lat),lat_ticks),labels=[1,0,0,0])
+                else:
+                    m.drawparallels(np.arange((np.min(lat)//10)*10+10,np.max(lat),lat_ticks))
+
+                if j == len(days) - 1:
+                    m.drawmeridians(np.arange((np.min(lon)//10)*10+10,np.max(lon),lon_ticks),labels=[0,0,0,1])
+                else:
+                    m.drawmeridians(np.arange((np.min(lon)//10)*10+10,np.max(lon),lon_ticks))
                 # fit plot to axis
                 # plot contours
-                cs = m.contourf(x,y,plot_data,clevs,cmap='bwr')
-                cs = m.contour(x,y,plot_data,clevs,linewidths=1,colors='k')
+                cs = m.contourf(x,y,plot_data,clevs,cmap=cmap)
+                csf = m.contour(x,y,plot_data,clevs,linewidths=1,colors='k')
                 # label day number
-                day_lab = AnchoredText('Day %d' % days[j], loc=1, frameon=True)
-                day_lab.patch.set_boxstyle('round,pad=0.,rounding_size=0.2')
-                ax[j,i].add_artist(day_lab)
+                if show_day == True:
+                    day_lab = AnchoredText('Day %d' % days[j], loc=1, frameon=True)
+                    day_lab.patch.set_boxstyle('round,pad=0.,rounding_size=0.2')
+                    if data.shape[0] == 1:
+                        ax[j].add_artist(day_lab)
+                    else:
+                        ax[j,i].add_artist(day_lab)
                 # plot center point
                 if center is not None:
-                    plt.plot(center[1],center[0],'g*')
+                    plt.plot(center[i,1],center[i,0], **marker_style)
             else:
                 plt.text(0.2,0.5,'Date out of range')
-
-    plt.tight_layout() 
-    return fig, ax
+    plt.subplots_adjust(left=0.1, right=0.85, wspace=0.01, hspace=0.05)
+    cax = fig.add_axes([0.875, 0.1, 0.025, 0.8])
+    cbar = plt.colorbar(cs, cax=cax, orientation='vertical')
+    return fig, ax, cax, cbar
 
 def plot_meridional_mean_evo(z_data, z_lon, t_data, t_lon, year,
                              day0, center_lon=None, day_range=[-30,30]):
@@ -351,10 +384,10 @@ def plot_meridional_mean_evo(z_data, z_lon, t_data, t_lon, year,
     t_extreme = np.max(np.absolute(t_anom_mer_mean))
     t_clevs = np.linspace(-((t_extreme+2)//2)*2,((t_extreme+2)//2)*2,num=10)
 
-    z_cs1 = z_ax1.contourf(zx,zy,z_anom_mer_mean,z_clevs,cmap='bwr')
-    t_cs = t_ax.contourf(tx,ty,t_anom_mer_mean,t_clevs,cmap='autumn')
-    z_cs2 = z_ax2.contourf(zx,zy,z_anom_standing_mer_mean,z_clevs,cmap='bwr')
-    z_cs3 = z_ax3.contourf(zx,zy,z_anom_travelling_mer_mean,z_clevs,cmap='bwr')
+    z_cs1 = z_ax1.contourf(zx,zy,z_anom_mer_mean,z_clevs,cmap=plt.cm.RdBu_r)
+    t_cs = t_ax.contourf(tx,ty,t_anom_mer_mean,t_clevs,cmap='rainbow')
+    z_cs2 = z_ax2.contourf(zx,zy,z_anom_standing_mer_mean,z_clevs,cmap=plt.cm.RdBu_r)
+    z_cs3 = z_ax3.contourf(zx,zy,z_anom_travelling_mer_mean,z_clevs,cmap=plt.cm.RdBu_r)
 
     # identify center and day0
     z_ax1.hlines(0,z_lon[0],z_lon[-1],linestyles='dashed')
@@ -399,3 +432,155 @@ def plot_meridional_mean_evo(z_data, z_lon, t_data, t_lon, year,
 
     ax = [z_ax1, t_ax, z_ax2, z_ax3]
     return fig, ax
+
+def plot_custom_meridional_mean_evo(data1,  lon1, year,
+        day0, data2=None, lon2=None, center_lon=None, day_range=[-30,30],
+        cmap1=plt.cm.RdBu_r, cmap2='rainbow', clev_bound1=None, clev_num1=20,
+        clev_bound2=None, clev_num2=20, cax_gap=0.025):
+    """
+    This function will create a set of plots showing the day by day evolution
+    of the meridional average of the given data.Fot reference see fig. 1 of
+    Kushner/Watt-Meyer's decomposition paper.
+
+    data - array containing z data with dimensions [# of
+             datasets,years,days,plev=1,z_lat,z_lon]
+    lon - coordinate information for corresponding array
+    year - the year in which the dates to be plotted reside
+    day0 - heat wave start date, or other date upon which to center the plots
+    center_lon - a longitude to identify with a line on the plots
+    day_range - number of days to plot on either side of day0.
+
+    Returns:
+    fig - a pyplot figure
+    ax - an array pyplot axes
+    cax - colorbar axes
+    """
+    # create figure/axes
+    fig = plt.figure(figsize=(17,11), facecolor='w')
+
+    left = 0.1
+    bottom = 0.1
+    width = 0.8
+    height = 0.8
+    gap = 0.01
+    cax_width = 0.025
+
+    if data2 is None:
+        total_lon = lon1.size*data1.shape[0]
+        total_plot_width = width - (cax_width+cax_gap) - gap*data1.shape[0]
+        panel_width1 = (lon1.size/float(total_lon))*total_plot_width
+    else:
+        total_lon = lon1.size*data1.shape[0] + lon2.size*data2.shape[0]
+        total_plot_width = width - (cax_width+cax_gap)*2 - gap*(data1.shape[0]+data2.shape[0])
+        panel_width1 = (lon1.size/float(total_lon))*total_plot_width
+        panel_width2 = (lon2.size/float(total_lon))*total_plot_width
+
+    # axis boundaries
+    rect1 = np.zeros((data1.shape[0],4))
+    ax1 = np.empty(data1.shape[0], dtype=object)
+    for i in range(data1.shape[0]):
+        rect1[i][0] = left + (panel_width1+gap)*i
+        rect1[i][1] = bottom
+        rect1[i][2] = panel_width1
+        rect1[i][3] = height
+        
+        if i == 0:
+            ax1[i] = fig.add_axes(rect1[i])
+        else:
+            ax1[i] = fig.add_axes(rect1[i],sharey=ax1[0])
+    
+    # colorbar axes
+    cax_rect1 = np.zeros(4)
+    cax_rect1[0] = left + (panel_width1+gap)*data1.shape[0]
+    cax_rect1[1] = bottom
+    cax_rect1[2] = cax_width
+    cax_rect1[3] = height
+
+    cax1 = fig.add_axes(cax_rect1)
+
+    if data2 is not None:
+        # axis boundaries
+        rect2 = np.zeros((data2.shape[0],4))
+        ax2 = np.empty(data2.shape[0], dtype=object)
+        for i in range(data2.shape[0]):
+            rect2[i][0] = left + (panel_width1+gap)*data1.shape[0] +\
+                (cax_width+cax_gap) + (panel_width2+gap)*i
+            rect2[i][1] = bottom
+            rect2[i][2] = panel_width2
+            rect2[i][3] = height
+            
+            ax2[i] = fig.add_axes(rect2[i],sharey=ax1[0])
+    
+        # colorbar axes
+        cax_rect2 = np.zeros(4)
+        cax_rect2[0] = left + (panel_width1+gap)*data1.shape[0] +\
+            (cax_width+cax_gap) + (panel_width2+gap)*data2.shape[0]
+        cax_rect2[1] = bottom
+        cax_rect2[2] = cax_width
+        cax_rect2[3] = height
+
+        cax2 = fig.add_axes(cax_rect2)
+
+    # take meridional averages and slice out time range of interest
+    data1_mer_mean = np.average(np.real(data1),axis=4)[:,year,
+                                    day0+day_range[0]:day0+day_range[1],:,:]
+    if data2 is not None:
+        data2_mer_mean = np.average(np.real(data2),axis=4)[:,year,
+                                    day0+day_range[0]:day0+day_range[1],:,:]
+
+    # set up contour plot
+    days = np.arange(day_range[0],day_range[1])
+    x1,y1 = np.meshgrid(lon1,days)
+    if data2 is not None:
+        x2,y2 = np.meshgrid(lon2,days)
+
+    if clev_bound1 is None:
+        extreme = np.max(np.absolute(data1_mer_mean))
+        clevs1 = np.linspace(-((extreme+10)//10)*10,
+                            ((extreme+10)//10)*10,num=clev_num1)
+    else:
+        clevs1 = np.linspace(clev_bound1[0],clev_bound1[1],num=clev_num1)
+
+    if data2 is not None:
+        if clev_bound2 is None:
+            extreme = np.max(np.absolute(data2_mer_mean))
+            clevs2 = np.linspace(-((extreme+10)//10)*10,
+                            ((extreme+10)//10)*10,num=clev_num2)
+        else:
+            clevs2 = np.linspace(clev_bound2[0],clev_bound2[1],num=clev_num2)
+    cs1 = np.empty(data1.shape[0],dtype=object)
+    for i in range(data1.shape[0]):
+        cs1[i] = ax1[i].contourf(x1,y1,np.squeeze(data1_mer_mean[i]),clevs1,cmap=cmap1)
+        cs = ax1[i].contour(x1,y1,np.squeeze(data1_mer_mean[i]), clevs1,
+                                linewidths=1, colors='k')
+    cbar1 = plt.colorbar(cs1[0], cax=cax1, orientation='vertical')
+
+    if data2 is not None:
+        cs2 = np.empty(data2.shape[0],dtype=object)
+        for i in range(data2.shape[0]):
+            cs2[i] = ax2[i].contourf(x2,y2,np.squeeze(data2_mer_mean[i]),clevs2,cmap=cmap2)
+        cbar2 = plt.colorbar(cs2[0], cax=cax2, orientation='vertical')
+
+    # identify center and day0
+    # format ticks
+    ax1[0].yaxis.set_major_locator(plt.MultipleLocator(3.0))
+    for i in range(data1.shape[0]):
+        ax1[i].xaxis.set_major_locator(plt.MultipleLocator(30.0))
+        if i > 0:
+            plt.setp(ax1[i].get_yticklabels(), visible=False)
+        ax1[i].hlines(0,lon1[0],lon1[-1],linestyles='dashed')
+        if center_lon is not None:
+            ax1[i].vlines(center_lon[i],days[0],days[-1],linestyles='dashed')
+
+    if data2 is not None:
+        for i in range(data2.shape[0]):
+            ax2[i].xaxis.set_major_locator(plt.MultipleLocator(30.0))
+            plt.setp(ax2[i].get_yticklabels(), visible=False)
+            ax2[i].hlines(0,lon2[0],lon2[-1],linestyles='dashed')
+            if center_lon is not None:
+                ax2[i].vlines(center_lon[0],days[0],days[-1],linestyles='dashed')
+
+    if data2 is not None:
+        return fig, ax1, cax1, cbar1, ax2, cax2, cbar2
+    else:
+        return fig, ax1, cax1, cbar1

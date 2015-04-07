@@ -192,6 +192,6 @@ ax[0,0].set_title('Composite Total Geoheight')
 ax[0,1].set_title('Composite Standing Geoheight')
 ax[0,2].set_title('Composite Travelling Geoheight')
 
-fig.savefig('output/evo_composite.png',format='png')
+#fig.savefig('output/evo_composite.png',format='png')
 
 plt.show()
