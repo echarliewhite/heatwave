@@ -1,3 +1,10 @@
+"""
+This module was authored by Oliver Watt-Meyer for use in spectral analysis of 
+standing and travelling waves as described in "Decomposition of Atmospheric 
+Disturbances into Standing and Traveling Components, with Application to 
+Northern Hemisphere Planetary Waves and Stratosphere–Troposphere Coupling" 
+by Watt-Meyer and Kushner (2014).
+"""
 import numpy as np
 from matplotlib import pyplot as plt
 
